@@ -49,44 +49,39 @@ public class CalculatorController {
         return expression.getText();
     }
     
-    //adds an operator to the expression
-    public void insertOperator(String op){
-        this.setExpression(this.getExpression() + " " + op + " ");
+    //inserts number or operation into the expression
+    public void insertChar(String ch){
+        setExpression(getExpression() + ch);
     }
     
     //opening parentheses needs special treatment
     public void insertParentheses(String paren){
-        String exp = this.getExpression();
+        String exp = getExpression();
         int size = exp.length();
         
         if(exp.isEmpty()){
-            setExpression(paren + " ");
+            setExpression(paren);
         }
         else if(exp.charAt(size - 1) >= '0' && exp.charAt(size - 1) <= '9'){
-            this.setExpression(this.getExpression() + " * " + paren + " ");
+            setExpression(getExpression() + "*" + paren);
         }
         else{
-            this.setExpression(this.getExpression() + paren + " ");
+            setExpression(getExpression() + paren);
         }
-    }
-    
-    //adds a number to the expression 
-    public void insertNum(String num){
-        this.setExpression(this.getExpression() + num);
     }
     
     //clear the expression
     public void clear(){
-        this.setExpression("");
-        this.setAnswer("");
+        setExpression("");
+        setAnswer("");
     }
     
     //delete last inputted character
     public void deleteLast(){
-        if(!this.getExpression().isEmpty()){
-            StringBuilder text = new StringBuilder(this.getExpression());
+        if(!getExpression().isEmpty()){
+            StringBuilder text = new StringBuilder(getExpression());
             text.deleteCharAt(text.length() - 1);
-            this.setExpression(text.toString());
+            setExpression(text.toString());
         }
     }
     
@@ -94,56 +89,75 @@ public class CalculatorController {
     public void evaluate(){
         ScriptEngineManager mgr = new ScriptEngineManager();
         ScriptEngine engine = mgr.getEngineByName("JavaScript");
-        String infix = this.getExpression();
+        String infix = getExpression();
         
         try {
             Object ans = engine.eval(infix);
-            this.setAnswer(ans.toString());
+            setAnswer(ans.toString());
         } 
         catch (ScriptException ex) {
-            this.setAnswer("Error");
+            setAnswer("Error");
         }
     }
     
-    //function for factorial which includes factorials for 
-    public String fact(String n){
-        double num = Double.parseDouble(n);
-        double ans = num - Math.floor(num) + 1;
+    //used to calculate expression inside of a parenthesis for simplifying expression
+    public String calcParenthesis(String exp){
+        ScriptEngineManager mgr = new ScriptEngineManager();
+        ScriptEngine engine = mgr.getEngineByName("JavaScript");
         
-        for(;num>1; num-=1){
-            ans *= num;
+        try {
+            Object ans = engine.eval(exp);
+            return ans.toString();
+        } 
+        catch (ScriptException ex) {
+            setAnswer("Error");
         }
         
-        return Double.toString(ans);
+        return exp;
     }
     
-    //helper function for adjustments that are made when +/- button is pressed
-    public StringBuilder plusMinusHelper(StringBuilder text, int index, char stop){
+    //helper function for the "+/-" button
+    public void plusMinusHelper(StringBuilder text, int index){
+        String num = text.substring(index, text.length());
+                
+        if(index == 0){
+            setExpression("-" + getExpression());
+        }
+        else if(text.charAt(index - 1) == '-'){
+            text.replace(index - 1, index, "+");
+            setExpression(text.toString());
+        }
+        else if(text.charAt(index - 1) == '+'){
+            text.replace(index - 1, index, "-");
+            setExpression(text.toString());
+        }
+        else{
+            setExpression(text.substring(0, index) + "-" + num);
+        }
+    }
+    
+    //helper function that finds index of where a number starts
+    public int getNumIndex(StringBuilder text, int index){
         for(;index>=0; index--){
-            if(text.charAt(index) == stop){
+            if(text.charAt(index) == '+' || text.charAt(index) == '-' || 
+                    text.charAt(index) == '/' || text.charAt(index) == '+' || 
+                    text.charAt(index) == '%' || text.charAt(index) == '*'){
                 break;
             }
         }
-        
-        if(index < 0) index = 0;
-        
-        if(index == 0){
-            text.reverse();
-            text.append(" -");
-            text.reverse();
+
+        return index;
+    }
+    
+    //helper function that finds index of contents inside parenthesis
+    public int getParenIndex(StringBuilder text, int index){
+        for(;index>=0; index--){
+            if(text.charAt(index) == '('){
+                break;
+            }
         }
-        else if(text.charAt(index - 1) == '+'){
-            text.replace(index - 1, index + 1, "- ");
-        }
-        else if(text.charAt(index - 1) == '-'){ 
-            text.replace(index - 1, index + 1, "+ ");
-        }
-        else if(text.charAt(index - 1) == '*' || text.charAt(index - 1) == '/'
-                || text.charAt(index - 1) == '%'){ 
-            text.replace(index, index + 1, " - ");
-        }
-        
-        return text;
+
+        return index;
     }
     
     //used to pull up history
@@ -163,8 +177,9 @@ public class CalculatorController {
         }
     }
     
+    //used to display in history window later on
     public void addCalculation(){
-        calculationHistory.add(this.getExpression() + " = " + this.getAnswer());
+        calculationHistory.add(getExpression() + " = " + getAnswer());
     }
     
     //handles all main functionality
@@ -174,125 +189,164 @@ public class CalculatorController {
         
         if(buttonText.charAt(0) >= '0' && buttonText.charAt(0) <= '9'
                 || buttonText.equals(".")){
-            insertNum(buttonText);
+            insertChar(buttonText);
         }
         else if(buttonText.equals("+") || buttonText.equals("-") || buttonText.equals("*")
                 || buttonText.equals("/") || buttonText.equals(")")){
-            insertOperator(buttonText);
+            insertChar(buttonText);
         }
         else if(buttonText.equals("(")){
             insertParentheses(buttonText);
         }
         
         //these require slightly different steps
-        if(buttonText.equals("pi")){
-            insertNum("3.14");
-        }
-        if(buttonText.equals("e")){
-            insertNum("2.71");
+        if(buttonText.equals("pi") || buttonText.equals("e")){
+            String exp = getExpression();
+            
+            if(exp.isEmpty()){
+                insertChar(buttonText.equals("pi") ? "3.14" : "2.71");
+            }
+            else if(exp.charAt(exp.length() - 1) == ')' ||
+                    exp.charAt(exp.length() - 1) >= '0' && exp.charAt(exp.length() - 1) <= '9'){
+                insertChar(buttonText.equals("pi") ? "*3.14" : "*2.71");
+            }
+            else{
+                insertChar(buttonText.equals("pi") ? "3.14" : "2.71");
+            }
         }
         
         //implementing functionality
         if(buttonText.equals("mod")){
-            insertOperator("%");
+            insertChar("%");
         }
         if(buttonText.equals("C")){
-            this.clear();
+            clear();
         }
         if(buttonText.equals("=")){
-            this.evaluate();
-            this.addCalculation();
+            evaluate();
+            addCalculation();
         }
         if(buttonText.equals("del")){
-            this.deleteLast();
+            deleteLast();
+        }
+        if(buttonText.equals("ans")){
+            setExpression(getAnswer());
+        }
+        if(buttonText.equals("hist")){
+            openHistoryWindow();
         }
         if(buttonText.equals("+/-")){
-            StringBuilder text = new StringBuilder(this.getExpression());
-            int index = text.length() - 1;
-            
-            if(text.charAt(index) >= '1' && text.charAt(index) <= '9'){
-                this.setExpression(plusMinusHelper(text, index, ' ').toString());
-            }
-            else if(text.charAt(index - 1) == ')'){
-                this.setExpression(plusMinusHelper(text, index - 1, '(').toString());
-            }
-        }
-        if(buttonText.equals("n!")){
-            StringBuilder text = new StringBuilder(this.getExpression());
+            StringBuilder text = new StringBuilder(getExpression());
             int index = text.length() - 1;
             
             if(text.charAt(index) >= '0' && text.charAt(index) <= '9'){
-                for(;index>=0; index--){
-                    if(text.charAt(index) == ' '){
-                        break;
-                    }
-                }
-                
-                String calculated = this.fact(text.substring(index + 1, text.length())); 
-                text.replace(index + 1, text.length(), calculated);
-                
-                this.setExpression(text.toString());
+                index = getNumIndex(text, index) + 1;
+                plusMinusHelper(text, index);
+            }
+            else if(text.charAt(index) == ')'){
+                index = getParenIndex(text, index);
+                plusMinusHelper(text, index);
             }
         }
+        
+        //these next functions follow similar logic
+        //if the last character added to the expression was a number just calculate
+        //if the last character was a ')' then calculate inside parenthesis
         if(buttonText.equals("ln")){
-            StringBuilder text = new StringBuilder(this.getExpression());
+            StringBuilder text = new StringBuilder(getExpression());
             int index = text.length() - 1;
             
             if(text.charAt(index) >= '0' && text.charAt(index) <= '9'){
-                for(;index>=0; index--){
-                    if(text.charAt(index) == ' '){
-                        break;
-                    }
-                }
+                index = getNumIndex(text, index);
                 
                 String num = text.substring(index + 1, text.length());
-                String calculated = Double.toString(Math.log(Double.parseDouble(num))); 
+                String calculated = Double.toString(Math.log(Double.parseDouble(num)));
+        
                 text.replace(index + 1, text.length(), calculated);
+                setExpression(text.toString());
+            }
+            else if(text.charAt(index) == ')'){
+                index = getParenIndex(text, index);
                 
-                this.setExpression(text.toString());
+                String num = text.substring(index + 1, text.length() - 1);
+                num = calcParenthesis(num);
+                String calculated = Double.toString(Math.log(Double.parseDouble(num)));
+        
+                text.replace(index + 1, text.length() - 1, calculated);
+                setExpression(text.toString());
             }
         }
         if(buttonText.equals("log")){
-            StringBuilder text = new StringBuilder(this.getExpression());
+            StringBuilder text = new StringBuilder(getExpression());
             int index = text.length() - 1;
             
             if(text.charAt(index) >= '0' && text.charAt(index) <= '9'){
-                for(;index>=0; index--){
-                    if(text.charAt(index) == ' '){
-                        break;
-                    }
-                }
+                index = getNumIndex(text, index);
                 
                 String num = text.substring(index + 1, text.length());
                 String calculated = Double.toString(Math.log10(Double.parseDouble(num))); 
-                text.replace(index + 1, text.length(), calculated);
                 
-                this.setExpression(text.toString());
+                text.replace(index + 1, text.length(), calculated);
+                setExpression(text.toString());
+            }
+            else if(text.charAt(index) == ')'){
+                index = getParenIndex(text, index);
+                
+                String num = text.substring(index + 1, text.length() - 1);
+                num = calcParenthesis(num);
+                String calculated = Double.toString(Math.log10(Double.parseDouble(num)));
+        
+                text.replace(index + 1, text.length() - 1, calculated);
+                setExpression(text.toString());
             }
         }
         if(buttonText.equals("x^2")){
-            StringBuilder text = new StringBuilder(this.getExpression());
+            StringBuilder text = new StringBuilder(getExpression());
             int index = text.length() - 1;
             
             if(text.charAt(index) >= '0' && text.charAt(index) <= '9'){
-                for(;index>=0; index--){
-                    if(text.charAt(index) == ' '){
-                        break;
-                    }
-                }
+                index = getNumIndex(text, index);
                 
                 String num = text.substring(index + 1, text.length());
-                String calculated = Double.toString(Math.pow(Double.parseDouble(num), 2)); 
-                text.replace(index + 1, text.length(), calculated);
+                String calculated = Double.toString(Math.pow(Double.parseDouble(num), 2));
                 
-                this.setExpression(text.toString());
+                text.replace(index + 1, text.length(), calculated);
+                setExpression(text.toString());
+            }
+            else if(text.charAt(index) == ')'){
+                index = getParenIndex(text, index);
+                
+                String num = text.substring(index + 1, text.length() - 1);
+                num = calcParenthesis(num);
+                String calculated = Double.toString(Math.pow(Double.parseDouble(num), 2));
+        
+                text.replace(index + 1, text.length() - 1, calculated);
+                setExpression(text.toString());
             }
         }
-        if(buttonText.equals("ans")){
-            this.setExpression(this.getAnswer());
-        }
-        if(buttonText.equals("hist")){
-            this.openHistoryWindow();
+        if(buttonText.equals("x^10")){
+            StringBuilder text = new StringBuilder(getExpression());
+            int index = text.length() - 1;
+            
+            if(text.charAt(index) >= '0' && text.charAt(index) <= '9'){
+                index = getNumIndex(text, index);
+                
+                String num = text.substring(index + 1, text.length());
+                String calculated = Double.toString(Math.pow(Double.parseDouble(num), 10));
+                
+                text.replace(index + 1, text.length(), calculated);
+                setExpression(text.toString());
+            }
+            else if(text.charAt(index) == ')'){
+                index = getParenIndex(text, index);
+                
+                String num = text.substring(index + 1, text.length() - 1);
+                num = calcParenthesis(num);
+                String calculated = Double.toString(Math.pow(Double.parseDouble(num), 10));
+        
+                text.replace(index + 1, text.length() - 1, calculated);
+                setExpression(text.toString());
+            }
         }
     }
 }
